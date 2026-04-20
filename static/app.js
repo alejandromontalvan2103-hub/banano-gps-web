@@ -10,15 +10,52 @@ let poligonoContorno = null;
 let marcadorInicio = null;
 let marcadorFin = null;
 
-async function actualizarUbicacion() {
+// CARGA EL RECORRIDO/POLIGONO UNA SOLA VEZ
+async function cargarRecorridoFijo() {
+  try {
+    const respuesta = await fetch('/api/historial');
+    const data = await respuesta.json();
+
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const puntos = data.map(p => [parseFloat(p.latitud), parseFloat(p.longitud)]);
+
+    // Dibujar línea roja permanente
+    lineaRuta = L.polyline(puntos, {
+      color: 'red',
+      weight: 4
+    }).addTo(map);
+
+    // Marcar inicio y fin
+    marcadorInicio = L.marker(puntos[0]).addTo(map).bindPopup("Inicio");
+    marcadorFin = L.marker(puntos[puntos.length - 1]).addTo(map).bindPopup("Fin");
+
+    // Dibujar polígono rojo semitransparente
+    if (puntos.length >= 3) {
+      poligonoContorno = L.polygon(puntos, {
+        color: 'red',
+        fillColor: 'red',
+        fillOpacity: 0.12
+      }).addTo(map);
+    }
+
+    map.fitBounds(lineaRuta.getBounds());
+
+  } catch (error) {
+    console.error("Error al cargar recorrido fijo:", error);
+  }
+}
+
+// ACTUALIZA SOLO LA POSICIÓN GPS ACTUAL
+async function actualizarUbicacionActual() {
   try {
     const respuesta = await fetch('/api/ubicacion');
     const data = await respuesta.json();
 
-    const latlng = [data.latitud, data.longitud];
+    const latlng = [parseFloat(data.latitud), parseFloat(data.longitud)];
 
     if (!markerActual) {
-      markerActual = L.marker(latlng).addTo(map);
+      markerActual = L.marker(latlng).addTo(map).bindPopup("GPS actual");
     } else {
       markerActual.setLatLng(latlng);
     }
@@ -32,47 +69,9 @@ async function actualizarUbicacion() {
   }
 }
 
-async function actualizarRuta() {
-  try {
-    const respuesta = await fetch('/api/historial');
-    const data = await respuesta.json();
+// SE CARGA UNA SOLA VEZ EL RECORRIDO ROJO
+cargarRecorridoFijo();
 
-    if (!Array.isArray(data) || data.length === 0) return;
-
-    const puntos = data.map(p => [parseFloat(p.latitud), parseFloat(p.longitud)]);
-
-    if (lineaRuta) map.removeLayer(lineaRuta);
-    if (poligonoContorno) map.removeLayer(poligonoContorno);
-    if (marcadorInicio) map.removeLayer(marcadorInicio);
-    if (marcadorFin) map.removeLayer(marcadorFin);
-
-    lineaRuta = L.polyline(puntos, {
-      color: 'red',
-      weight: 4
-    }).addTo(map);
-
-    marcadorInicio = L.marker(puntos[0]).addTo(map).bindPopup("Inicio");
-    marcadorFin = L.marker(puntos[puntos.length - 1]).addTo(map).bindPopup("Fin");
-
-    if (puntos.length >= 3) {
-      poligonoContorno = L.polygon(puntos, {
-        color: 'red',
-        fillColor: 'red',
-        fillOpacity: 0.15
-      }).addTo(map);
-    }
-
-    map.fitBounds(lineaRuta.getBounds());
-
-  } catch (error) {
-    console.error("Error al cargar historial:", error);
-  }
-}
-
-async function actualizarMapaCompleto() {
-  await actualizarUbicacion();
-  await actualizarRuta();
-}
-
-actualizarMapaCompleto();
-setInterval(actualizarMapaCompleto, 3000);
+// SE ACTUALIZA SIEMPRE EL GPS EN TIEMPO REAL
+actualizarUbicacionActual();
+setInterval(actualizarUbicacionActual, 3000);
