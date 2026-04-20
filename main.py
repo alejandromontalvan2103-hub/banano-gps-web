@@ -27,6 +27,7 @@ def get_connection():
 def home():
     return render_template("index.html")
 
+# Devuelve solo el último punto
 @app.route("/api/ubicacion", methods=["GET"])
 def obtener_ubicacion():
     try:
@@ -59,6 +60,27 @@ def obtener_ubicacion():
             "velocidad": 0,
             "hora": str(fila["fecha"])
         })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Devuelve todos los puntos para dibujar ruta/polígono
+@app.route("/api/historial", methods=["GET"])
+def obtener_historial():
+    try:
+        conexion = get_connection()
+
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, latitud, longitud, fecha
+                FROM historial_gps
+                ORDER BY id ASC
+            """)
+            filas = cursor.fetchall()
+
+        conexion.close()
+
+        return jsonify(filas)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
